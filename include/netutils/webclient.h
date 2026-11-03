@@ -120,6 +120,13 @@
  */
 #define WEBCLIENT_FLAG_TUNNEL 2U
 
+/* Opt-in HTTP/1.1 persistence. Only a complete, explicitly framed response
+ * on a direct connection can return a connection for another request.
+ * There is no pipelining; the caller must serialize requests to one origin.
+ */
+
+#define WEBCLIENT_FLAG_KEEPALIVE 4U
+
 /* The following WEBCLIENT_FLAG_xxx constants are for
  * webclient_poll_info::flags.
  */
@@ -452,6 +459,14 @@ struct webclient_context
   FAR void *tls_ctx;
   unsigned int flags;
 
+  /* Optional same-origin connection, transferred to perform() when used.
+   * On completion, a reusable connection is returned here; otherwise it is
+   * closed. The caller owns a returned connection and must close/free it.
+   * Its TLS context must outlive the connection, including idle periods.
+   */
+
+  FAR struct webclient_conn_s *connection;
+
   /* results
    *
    *   http_status     - HTTP status code
@@ -463,6 +478,11 @@ struct webclient_context
    */
 
   unsigned int http_status;
+  bool response_framed;
+  bool response_chunked;
+  bool response_http11;
+  bool response_close;
+  bool response_body_complete;
   FAR char *http_reason;
   size_t http_reason_len;
 
@@ -492,6 +512,8 @@ struct webclient_poll_info
 struct webclient_conn_s
 {
   bool tls;
+  FAR char *origin;
+  uint16_t origin_port;
 
   /* for !tls */
 
